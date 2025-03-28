@@ -9,12 +9,19 @@
 #include <MFRC522.h>
 #include <SPI.h>
 
+//RFID pins
 #define RST_PIN 22
 #define SS_PIN 21
+
+// IR sensor pins
 #define IR_SENSOR_2 5
 #define IR_SENSOR 2
+
+// DHT sensor pins
 #define DHTPIN 4
 #define DHTTYPE DHT11
+
+// DHT sensor object
 DHT dht(DHTPIN, DHTTYPE);
 MFRC522 rfid(SS_PIN, RST_PIN);
 
@@ -22,7 +29,7 @@ MFRC522 rfid(SS_PIN, RST_PIN);
 const char* ssid = "IoT_Emb";
 const char* password = "98806829";
 
-// Firebase settings
+// Firebase settings for board kan tilgå firebase databasen
 #define Firebase_host "https://iotproject-f178a-default-rtdb.europe-west1.firebasedatabase.app/"
 #define Firebase_auth "hrGCMLLFrMk8di2VpWfoFmHqPPUB1M0xx1kwkX2v"
 
@@ -210,7 +217,7 @@ void readRFID(){
   if(!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()){
     return;
   }
-  //read rfid tagu+ uid
+  //read rfid tag uid
   String rfidUID = "";
   for(byte i=0;i<rfid.uid.size;i++){
     rfidUID+=String(rfid.uid.uidByte[i],HEX);
@@ -234,7 +241,7 @@ void readRFID(){
           timeInfo->tm_sec);
 
 
-  // Send RFID UID to firebase
+  // Send RFID UID to firebase via json object
   FirebaseJson json;
   json.set("rfid", rfidUID);
   json.set("timestamp", datetime);
