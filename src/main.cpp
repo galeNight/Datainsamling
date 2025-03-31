@@ -283,12 +283,14 @@ void uploadCachedData() {
     return;
   }
 
+  // Open the cache file for reading
   File file = SPIFFS.open("/cache.txt", FILE_READ);
   if (!file || !file.available()) {
     file.close();
     return;
   }
 
+  // Read each line from the cache file and send to Firebase
   while (file.available()) {
     String jsonData = file.readStringUntil('\n');
     FirebaseJson json;
@@ -333,10 +335,10 @@ void loop() {
     uploadCachedData(); // Upload cached data when WiFi is reconnected
   }
 
-  // Detect movement direction
+  // call detectDirection function
   detectDirection();
 
-  // Read RFID
+  // call readRFID function
   readRFID();
 
     unsigned long currentMillis = millis();
