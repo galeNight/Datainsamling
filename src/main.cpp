@@ -164,7 +164,7 @@ void detectDirection() {
   static bool sensor5Triggered = false; 
   static unsigned long sensor2Time = 0;
   static unsigned long sensor5Time = 0;
-
+  
   // Auto-unlock sensors after the unlock interval
   if(sensor2locktime && millis() - sensor2locktime > unlockInterval){
     sensor2locked=false;
@@ -212,6 +212,18 @@ void detectDirection() {
   }
 }
 
+// Function to save data to SPIFFS cache
+void saveToCache(String jsonData) {
+  File file = SPIFFS.open("/cache.txt", FILE_APPEND);
+  if (!file) {
+    Serial.println("Failed to open cache file");
+    return;
+  }
+  file.println(jsonData); // Append the JSON data to the file
+  file.close();
+  Serial.println("Data saved to cache");
+}
+
 // function to read RFID
 void readRFID(){
   if(!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()){
@@ -246,6 +258,11 @@ void readRFID(){
   json.set("rfid", rfidUID);
   json.set("timestamp", datetime);
 
+  // Convert JSON to a string
+  String jsonData;
+  json.toString(jsonData, true);
+
+  // Attempt to send data to Firebase
   if(WiFi.status() == WL_CONNECTED){
     if(Firebase.pushJSON(firebaseData, "/RFIDData", json)){
       Serial.println("RFID sent to Firebase");
@@ -253,49 +270,53 @@ void readRFID(){
       Serial.print("Failed to send RFID: ");
       Serial.println(firebaseData.errorReason());
     }
+  }else{
+    Serial.println("WiFi disconnected. Saving RFID to cache");
+    saveToCache(jsonData); // Save to cache if WiFi is disconnected
   }
   rfid.PICC_HaltA();
-}
-
-// Function to save data to SPIFFS cache
-void saveToCache(String jsonData) {
-  File file = SPIFFS.open("/cache.txt", FILE_APPEND);
-  if (!file) {
-    Serial.println("Failed to open cache file");
-    return;
-  }
-  file.println(jsonData); // Append the JSON data to the file
-  file.close();
-  Serial.println("Data saved to cache");
 }
 
 // Function to upload cached data to Firebase
 void uploadCachedData() {
   if (!SPIFFS.exists("/cache.txt")) {
-    // No cached data, skip unnecessary checks
     return;
   }
+
   File file = SPIFFS.open("/cache.txt", FILE_READ);
   if (!file || !file.available()) {
-    // File exists but is empty, close and skip
     file.close();
     return;
   }
-  // Upload cached data line by line
+
   while (file.available()) {
     String jsonData = file.readStringUntil('\n');
     FirebaseJson json;
     json.setJsonData(jsonData);
-    if (Firebase.pushJSON(firebaseData, "/SensorData", json)) {
-      Serial.println("Cached data sent to Firebase");
+
+    // Determine if data is RFID or SensorData based on content
+    if (jsonData.indexOf("\"rfid\"") != -1) {
+      if (Firebase.pushJSON(firebaseData, "/RFIDData", json)) {
+        Serial.println("Cached RFID data sent to Firebase");
+      } else {
+        Serial.print("Failed to send cached RFID data: ");
+        Serial.println(firebaseData.errorReason());
+        break;
+      }
     } else {
-      Serial.print("Failed to send cached data: ");
-      Serial.println(firebaseData.errorReason());
-      break; // Stop further uploads if any entry fails
+      if (Firebase.pushJSON(firebaseData, "/SensorData", json)) {
+        Serial.println("Cached sensor data sent to Firebase");
+      } else {
+        Serial.print("Failed to send cached sensor data: ");
+        Serial.println(firebaseData.errorReason());
+        break;
+      }
     }
   }
+
   file.close();
-  // Clear the cache only if all data was uploaded successfully
+
+  // Clear cache if all data was successfully uploaded
   if (WiFi.status() == WL_CONNECTED) {
     SPIFFS.remove("/cache.txt");
     Serial.println("Cache cleared after successful upload");
