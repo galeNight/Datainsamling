@@ -124,6 +124,7 @@ void checkWiFiConnection() {
 void reconnectFirebase() {
   if (!Firebase.ready()) {
     Serial.println("Firebase not ready. Reinitializing...");
+    delay(1000);
     Firebase.begin(&config, &auth);
   }
 }
@@ -142,7 +143,7 @@ bool detectMovementIND(){
   previousIRStateIND = currentIRState;
   return false;
 }
-
+ 
 // function to detect movement OUT
 bool detectMovementOUT(){
   static int previousIRState = HIGH;
@@ -327,7 +328,13 @@ void uploadCachedData() {
 
 // Main loop
 void loop() {
+
+  unsigned long currentMillis = millis();
+
+  // Check Wi-Fi connection and reconnect if necessary
   checkWiFiConnection();
+
+  // Reconnect Firebase if necessary
   reconnectFirebase();
 
   // Check if there's cached data to upload
@@ -340,8 +347,6 @@ void loop() {
 
   // call readRFID function
   readRFID();
-
-    unsigned long currentMillis = millis();
 
   // Check if 1 minute has passed since the last reading
   if (currentMillis - previousMillis >= interval) {
